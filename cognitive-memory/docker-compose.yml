@@ -1,0 +1,58 @@
+version: '3.9'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: memory_db
+    environment:
+      POSTGRES_DB: cognitive_state
+      POSTGRES_USER: intelligence
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-neural_network_2024}
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./init.sql:/docker-entrypoint-initdb.d/01-init.sql
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U intelligence"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - cognitive_net
+
+  app:
+    build: .
+    container_name: cognitive_engine
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://intelligence:${DB_PASSWORD:-neural_network_2024}@postgres:5432/cognitive_state
+      PYTHONUNBUFFERED: 1
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./app:/app
+      - ./data:/data
+    command: python -m uvicorn api:app --host 0.0.0.0 --port 8000 --reload
+    networks:
+      - cognitive_net
+
+  redis:
+    image: redis:7-alpine
+    container_name: memory_cache
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - cognitive_net
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  cognitive_net:
+    driver: bridge
